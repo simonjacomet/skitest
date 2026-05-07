@@ -190,6 +190,7 @@
       <div class="bed-field"><label>Gelände</label>
         <select id="gelaende"><option value="">Wählen…</option><option>Flach</option><option>Mittelsteil</option><option>Steil</option><option>Gemischt</option></select>
       </div>
+      <div class="bed-field full"><label>Struktur (Schleifprogramm)</label><input type="text" id="struktur" placeholder="z.B. Kalt · DZ 7–8 · VS 6"></div>
     </div>
     <button class="primary-btn" onclick="startSession()">Tests starten →</button>
   </div>
@@ -291,7 +292,7 @@ const TESTS=[
 function saveToStorage(key,val){try{localStorage.setItem(key,JSON.stringify(val))}catch(e){}}
 function loadFromStorage(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def}catch(e){return def}}
 
-let session={fahrer:null,ski:null,skiSub:null,ort:'',proto:'',iteration:'',datum:'',temp:'',schnee:'',gelaende:'',results:{}};
+let session={fahrer:null,ski:null,skiSub:null,ort:'',proto:'',iteration:'',datum:'',temp:'',schnee:'',gelaende:'',struktur:'',results:{}};
 let savedSessions=loadFromStorage('jacomet_sessions',[]);
 let customFahrer=loadFromStorage('jacomet_fahrer',['Simon','Bono','Vica']);
 let customSki=loadFromStorage('jacomet_ski',[{name:'dai! 173',sub:'Full TP · Esche'},{name:'sibla! 173',sub:'Full TP · Stein'}]);
@@ -384,6 +385,7 @@ function startSession(){
   session.temp=document.getElementById('temp').value;
   session.schnee=document.getElementById('schnee').value;
   session.gelaende=document.getElementById('gelaende').value;
+  session.struktur=document.getElementById('struktur').value;
   session.results={};
   document.getElementById('ctx-fahrer').textContent=session.fahrer;
   document.getElementById('ctx-ski').textContent=session.ski;
@@ -409,7 +411,7 @@ function renderTestCards(){
 let currentTest=null;
 function openTest(nr){
   currentTest=TESTS.find(t=>t.nr===nr);
-  const res=session.results[nr]||{kriterien:currentTest.kriterien.map(()=>({bew:null,notiz:''})),gesamt:null,gesamtNotiz:''};
+  const res=session.results[nr]||{kriterien:currentTest.kriterien.map(()=>({bew:null,notiz:''})),gesamt:null,gesamtNotiz:'',gleit:''};
   session.results[nr]=res;
   document.getElementById('detail-title').textContent=`Test ${nr}`;
   document.getElementById('detail-badge').textContent=currentTest.name;
@@ -424,6 +426,11 @@ function openTest(nr){
       </div>
       <textarea class="notiz-area" placeholder="Notiz (optional)…" oninput="setNotiz(${i},this.value)">${res.kriterien[i].notiz}</textarea>
     </div>`).join('')+`
+    <div class="kriterium-card" id="krit-gleit">
+      <div class="krit-label">Gleitqualität</div>
+      <textarea class="notiz-area" placeholder="Beobachtungen zur Gleitqualität auf dem Belag — Geschwindigkeit, Gefühl, Vergleich zum vorherigen Schliff…"
+        oninput="setGleit(this.value)">${res.gleit||''}</textarea>
+    </div>
     <div class="gesamtbew-card">
       <div class="krit-label">Gesamtbewertung Test ${nr}</div>
       <div class="bewertung-row">
@@ -453,6 +460,7 @@ function setGesamt(val){
   document.querySelector(`.gesamtbew-card .bew-btn.${map[val]}`).classList.add('selected');
 }
 function setGesamtNotiz(val){session.results[currentTest.nr].gesamtNotiz=val}
+function setGleit(val){session.results[currentTest.nr].gleit=val}
 function saveTest(){showToast('Test gespeichert ✓');setTimeout(()=>goTo('s-tests'),600)}
 
 function finishSession(){
@@ -474,6 +482,7 @@ function renderSummary(){
       html+=`<div class="krit-row"><div class="kr-name">${t.kriterien[i]}</div><div class="kr-bew ${bc}">${k.bew||'—'}</div></div>`;
       if(k.notiz)html+=`<div class="krit-row"><div class="kr-notiz">↳ ${k.notiz}</div></div>`;
     });
+    if(res.gleit)html+=`<div class="krit-row"><div class="kr-notiz" style="color:var(--ice, #52A8D2);font-style:normal;font-weight:500">🎿 Gleitqualität: ${res.gleit}</div></div>`;
     if(res.gesamtNotiz)html+=`<div class="krit-row"><div class="kr-notiz" style="color:var(--navy);font-style:normal;font-weight:500">📝 ${res.gesamtNotiz}</div></div>`;
     html+=`</div>`;
   });
@@ -493,11 +502,12 @@ function exportAndSave(){
   // Text exportieren
   const dateStr=session.datum?new Date(session.datum).toLocaleDateString('de-CH'):'—';
   let txt=`JACOMET SKI TESTPROTOKOLL\n${'═'.repeat(40)}\n`;
-  txt+=`Fahrer:  ${session.fahrer}\nSki:     ${session.ski}\nProto:   ${session.proto||'—'}\nIteration: ${session.iteration||'—'}\nOrt:     ${session.ort||'—'}\nDatum:   ${dateStr}\nSchnee:  ${session.schnee||'—'}\nGelände: ${session.gelaende||'—'}\nTemp:    ${session.temp?session.temp+'°C':'—'}\n${'─'.repeat(40)}\n\n`;
+  txt+=`Fahrer:  ${session.fahrer}\nSki:     ${session.ski}\nProto:   ${session.proto||'—'}\nIteration: ${session.iteration||'—'}\nStruktur: ${session.struktur||'—'}\nOrt:     ${session.ort||'—'}\nDatum:   ${dateStr}\nSchnee:  ${session.schnee||'—'}\nGelände: ${session.gelaende||'—'}\nTemp:    ${session.temp?session.temp+'°C':'—'}\n${'─'.repeat(40)}\n\n`;
   TESTS.forEach(t=>{
     const res=session.results[t.nr];if(!res)return;
     txt+=`TEST ${t.nr}: ${t.name}\n`;
     res.kriterien.forEach((k,i)=>{txt+=`  · ${t.kriterien[i]}: ${k.bew||'—'}\n`;if(k.notiz)txt+=`    → ${k.notiz}\n`});
+    if(res.gleit)txt+=`  Gleitqualität: ${res.gleit}\n`;
     txt+=`  Gesamt: ${res.gesamt||'—'}\n`;if(res.gesamtNotiz)txt+=`  Notiz: ${res.gesamtNotiz}\n`;txt+=`\n`;
   });
   txt+=`${'═'.repeat(40)}\nJACOMET Ski System · ${dateStr}\n`;
@@ -546,7 +556,7 @@ function deleteSession(e,idx){
   showToast('Session gelöscht');
 }
 
-function newSession(){session={fahrer:null,ski:null,skiSub:null,ort:'',proto:'',iteration:'',datum:'',temp:'',schnee:'',gelaende:'',results:{}};goTo('s-home')}
+function newSession(){session={fahrer:null,ski:null,skiSub:null,ort:'',proto:'',iteration:'',datum:'',temp:'',schnee:'',gelaende:'',struktur:'',results:{}};goTo('s-home')}
 
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
